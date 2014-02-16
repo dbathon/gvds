@@ -1,0 +1,13 @@
+<datasources xmlns="http://www.jboss.org/ironjacamar/schema">
+  <datasource jndi-name="java:/datasources/gvdsDS" pool-name="gvdsDS" jta="true">
+    <connection-url>jdbc:postgresql://127.0.0.1:5432/gvds</connection-url>
+    <driver>postgresql-9.1-903.jdbc4.jar</driver>
+    <pool>
+      <max-pool-size>20</max-pool-size>
+    </pool>
+    <security>
+      <user-name>gvds</user-name>
+      <password>gvds</password>
+    </security>
+  </datasource>
+</datasources>
