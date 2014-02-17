@@ -71,14 +71,6 @@
       <scope>provided</scope>
     </dependency>
 
-    <!-- TODO: remove -->
-    <dependency>
-      <groupId>org.hibernate</groupId>
-      <artifactId>hibernate-core</artifactId>
-      <version>4.3.0.Final</version>
-      <scope>provided</scope>
-    </dependency>
-
     <!-- Annotation processor that raises compilation errors whenever constraint annotations are incorrectly 
       used. -->
     <dependency>
