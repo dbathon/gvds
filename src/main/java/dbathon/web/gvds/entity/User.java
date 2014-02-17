@@ -14,15 +14,14 @@ import javax.validation.constraints.Size;
 public class User extends AbstractEntityWithUuidAsId {
 
   private String username;
-  private String passwordHash;
+  private byte[] passwordHash;
 
   private long version = 0;
 
   protected User() {}
 
-  public User(String username, String passwordHash) {
+  public User(String username) {
     this.username = username;
-    this.passwordHash = passwordHash;
   }
 
   @Column(name = "USERNAME_", unique = true, nullable = false, length = 1000)
@@ -39,12 +38,11 @@ public class User extends AbstractEntityWithUuidAsId {
 
   @Column(name = "PASSWORD_HASH", nullable = false, length = 1000)
   @NotNull
-  @Size(min = 1, max = 1000)
-  public String getPasswordHash() {
+  public byte[] getPasswordHash() {
     return passwordHash;
   }
 
-  public void setPasswordHash(String passwordHash) {
+  public void setPasswordHash(byte[] passwordHash) {
     this.passwordHash = passwordHash;
   }
 
