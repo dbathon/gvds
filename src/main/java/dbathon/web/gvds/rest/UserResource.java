@@ -6,7 +6,9 @@ import javax.inject.Inject;
 import javax.persistence.EntityManager;
 import javax.transaction.Transactional;
 import javax.ws.rs.Consumes;
+import javax.ws.rs.GET;
 import javax.ws.rs.POST;
+import javax.ws.rs.PUT;
 import javax.ws.rs.Path;
 import javax.ws.rs.Produces;
 import javax.ws.rs.core.MediaType;
@@ -32,10 +34,28 @@ public class UserResource {
   @Inject
   private Pbkdf2Service pbkdf2Service;
 
+  @Inject
+  private UserAndVersionContext userAndVersionContext;
+
   static class UserDto {
+    public UserDto(String username, String password, long version) {
+      this.username = username;
+      this.password = password;
+      this.version = version;
+    }
+
     public String username;
     public String password;
     public long version;
+  }
+
+  private UserDto extractUserDto(String jsonString) {
+    final UserDto userDto =
+        restHelper.notNullOrInvalidRequest(restHelper.fromJsonString(jsonString, UserDto.class));
+    if (Strings.isNullOrEmpty(userDto.username) || Strings.isNullOrEmpty(userDto.password)) {
+      restHelper.invalidRequest();
+    }
+    return userDto;
   }
 
   /**
@@ -44,11 +64,7 @@ public class UserResource {
   @POST
   @Transactional
   public Response createUser(String jsonString) {
-    final UserDto userDto =
-        restHelper.notNullOrInvalidRequest(restHelper.fromJsonString(jsonString, UserDto.class));
-    if (Strings.isNullOrEmpty(userDto.username) || Strings.isNullOrEmpty(userDto.password)) {
-      restHelper.invalidRequest();
-    }
+    final UserDto userDto = extractUserDto(jsonString);
     final List<String> existing =
         JpaUtil.query(entityManager, String.class, "select e.id from User e where e.username = ?1",
             userDto.username);
@@ -60,6 +76,29 @@ public class UserResource {
     user.setPasswordHash(pbkdf2Service.hashPassword(userDto.password, user.getId()));
     entityManager.persist(user);
     return restHelper.buildResultResponse(Status.OK, "user created");
+  }
+
+  @GET
+  @Path("current")
+  @Transactional
+  @AuthorizationRequired
+  public Response currentUserInfo() {
+    final User user = userAndVersionContext.getUser();
+    return restHelper.buildResultResponse(Status.OK,
+        new UserDto(user.getUsername(), null, user.getVersion()));
+  }
+
+  @PUT
+  @Path("current")
+  @Transactional
+  @AuthorizationRequired
+  public Response updateCurrentUser(String jsonString) {
+    final UserDto userDto = extractUserDto(jsonString);
+    final User user = userAndVersionContext.getUserForWrite();
+    user.setUsername(userDto.username);
+    user.setPasswordHash(pbkdf2Service.hashPassword(userDto.password, user.getId()));
+
+    return currentUserInfo();
   }
 
 }
