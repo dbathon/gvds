@@ -17,7 +17,6 @@ import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonParseException;
-import com.google.gson.LongSerializationPolicy;
 import com.google.gson.reflect.TypeToken;
 
 @ApplicationScoped
@@ -39,7 +38,6 @@ public class RestHelper {
       // TODO: make pretty printing configurable per request?
       gsonBuilder.setPrettyPrinting();
       gsonBuilder.disableHtmlEscaping();
-      gsonBuilder.setLongSerializationPolicy(LongSerializationPolicy.STRING);
 
       gson = this.gson = gsonBuilder.create();
     }
