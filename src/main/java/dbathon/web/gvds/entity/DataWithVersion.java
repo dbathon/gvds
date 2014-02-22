@@ -45,8 +45,8 @@ public class DataWithVersion extends AbstractEntity {
 
   private DataType dataType;
 
-  private String orderKey1;
-  private String orderKey2;
+  private String key1;
+  private String key2;
 
   private byte[] data;
 
@@ -55,13 +55,13 @@ public class DataWithVersion extends AbstractEntity {
 
   protected DataWithVersion() {}
 
-  private DataWithVersion(String id, DataType dataType, long versionFrom, String orderKey1,
-      String orderKey2, String dataString, Collection<String> references) {
+  private DataWithVersion(String id, DataType dataType, long versionFrom, String key1, String key2,
+      String dataString, Collection<String> references) {
     this.id = id;
     this.dataType = dataType;
     this.versionFrom = versionFrom;
-    this.orderKey1 = orderKey1;
-    this.orderKey2 = orderKey2;
+    this.key1 = key1;
+    this.key2 = key2;
     data = StringToBytes.toBytes(dataString);
     this.references.addAll(references);
 
@@ -76,20 +76,19 @@ public class DataWithVersion extends AbstractEntity {
   /**
    * Constructor for new data.
    */
-  public DataWithVersion(DataType dataType, long versionFrom, String orderKey1, String orderKey2,
+  public DataWithVersion(DataType dataType, long versionFrom, String key1, String key2,
       String dataString, Collection<String> references) {
-    this(AbstractEntityWithUuidAsId.newBase64Uuid(), dataType, versionFrom, orderKey1, orderKey2,
-        dataString, references);
+    this(AbstractEntityWithUuidAsId.newBase64Uuid(), dataType, versionFrom, key1, key2, dataString,
+        references);
   }
 
   /**
    * Constructor for a new version of existing data. This constructor also updates
    * <code>previous</code>'s {@link #getVersionTo() versionTo}.
    */
-  public DataWithVersion(DataWithVersion previous, long versionFrom, String orderKey1,
-      String orderKey2, String dataString, Collection<String> references) {
-    this(previous.getId(), previous.getDataType(), versionFrom, orderKey1, orderKey2, dataString,
-        references);
+  public DataWithVersion(DataWithVersion previous, long versionFrom, String key1, String key2,
+      String dataString, Collection<String> references) {
+    this(previous.getId(), previous.getDataType(), versionFrom, key1, key2, dataString, references);
 
     if (versionFrom <= previous.getVersionFrom()) {
       throw new IllegalArgumentException("versionFrom must be after previous.versionFrom: "
@@ -148,24 +147,24 @@ public class DataWithVersion extends AbstractEntity {
     this.dataType = dataType;
   }
 
-  @Column(name = "ORDER_KEY1", length = 1000)
+  @Column(name = "KEY_1", length = 1000)
   @Size(max = 1000)
-  public String getOrderKey1() {
-    return orderKey1;
+  public String getKey1() {
+    return key1;
   }
 
-  protected void setOrderKey1(String orderKey1) {
-    this.orderKey1 = orderKey1;
+  protected void setKey1(String key1) {
+    this.key1 = key1;
   }
 
-  @Column(name = "ORDER_KEY2", length = 1000)
+  @Column(name = "KEY_2", length = 1000)
   @Size(max = 1000)
-  public String getOrderKey2() {
-    return orderKey2;
+  public String getKey2() {
+    return key2;
   }
 
-  protected void setOrderKey2(String orderKey2) {
-    this.orderKey2 = orderKey2;
+  protected void setKey2(String key2) {
+    this.key2 = key2;
   }
 
   /**
