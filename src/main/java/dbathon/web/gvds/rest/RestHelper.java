@@ -1,6 +1,9 @@
 package dbathon.web.gvds.rest;
 
+import java.net.URI;
 import javax.enterprise.context.ApplicationScoped;
+import javax.inject.Inject;
+import javax.servlet.http.HttpServletRequest;
 import javax.validation.ConstraintViolationException;
 import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.HttpHeaders;
@@ -26,6 +29,9 @@ public class RestHelper {
 
   public static final Object MEDIA_TYPE_JSON_UTF_8 =
       MediaType.APPLICATION_JSON_TYPE.withCharset(Charsets.UTF_8.name());
+
+  @Inject
+  private HttpServletRequest request;
 
   private volatile Gson gson;
 
@@ -67,12 +73,34 @@ public class RestHelper {
     return builder.build();
   }
 
+  public Response buildJsonResponse(StatusType status, Object object) {
+    return buildJsonResponse(Response.status(status), object);
+  }
+
   public Response buildResultResponse(StatusType status, Object object) {
-    return buildJsonResponse(Response.status(status), ImmutableMap.of("result", object));
+    return buildJsonResponse(status, ImmutableMap.of("result", object));
   }
 
   public Response buildErrorResponse(StatusType status, String message) {
-    return buildJsonResponse(Response.status(status), ImmutableMap.of("error", message));
+    return buildJsonResponse(status, ImmutableMap.of("error", message));
+  }
+
+  public Response buildCreatedResponse(String relativePath, Object object) {
+    String baseUri = System.getProperty("gvds.baseUri");
+    if (baseUri == null) {
+      // fallback to current request URL...
+      final String requestUrl = request.getRequestURL().toString();
+      final String requestPath = request.getRequestURI();
+      if (!requestUrl.endsWith(requestPath)) {
+        throw new IllegalStateException("requestUrl does not end with requestPath: " + requestUrl
+            + ", " + relativePath);
+      }
+      baseUri =
+          requestUrl.substring(0, requestUrl.length() - requestPath.length())
+              + request.getContextPath() + "/";
+    }
+
+    return buildJsonResponse(Response.created(URI.create(baseUri + relativePath)), object);
   }
 
   public void invalidRequest() {
@@ -82,6 +110,13 @@ public class RestHelper {
   public <T> T notNullOrInvalidRequest(T t) {
     if (t == null) {
       invalidRequest();
+    }
+    return t;
+  }
+
+  public <T> T notNullOr404(T t) {
+    if (t == null) {
+      throw new RequestError("not found", Status.NOT_FOUND);
     }
     return t;
   }

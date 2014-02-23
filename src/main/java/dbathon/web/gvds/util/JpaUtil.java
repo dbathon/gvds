@@ -19,4 +19,29 @@ public final class JpaUtil {
     return query.getResultList();
   }
 
+  public static <T> T queryOne(EntityManager entityManager, Class<T> resultType,
+      String queryString, Object... parameters) {
+    final List<T> list = query(entityManager, resultType, queryString, parameters);
+    if (list.size() == 1) {
+      return list.get(0);
+    }
+    else {
+      throw new IllegalStateException("queryOne with " + list.size() + " results");
+    }
+  }
+
+  public static <T> T queryOneOrNone(EntityManager entityManager, Class<T> resultType,
+      String queryString, Object... parameters) {
+    final List<T> list = query(entityManager, resultType, queryString, parameters);
+    if (list.isEmpty()) {
+      return null;
+    }
+    else if (list.size() == 1) {
+      return list.get(0);
+    }
+    else {
+      throw new IllegalStateException("queryOneOrNone with " + list.size() + " results");
+    }
+  }
+
 }
