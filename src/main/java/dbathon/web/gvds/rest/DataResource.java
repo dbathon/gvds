@@ -1,6 +1,7 @@
 package dbathon.web.gvds.rest;
 
 import java.util.Collections;
+import java.util.Objects;
 import java.util.Set;
 import javax.enterprise.context.ApplicationScoped;
 import javax.inject.Inject;
@@ -98,6 +99,10 @@ public class DataResource {
     if (dataDto.references == null) {
       dataDto.references = Collections.<String>emptySet();
     }
+    else {
+      // make sure references does not contain null
+      dataDto.references.remove(null);
+    }
     return dataDto;
   }
 
@@ -173,16 +178,25 @@ public class DataResource {
   @Path("{type}/id/{id}")
   public Response deleteData(@PathParam("type") String type, @PathParam("id") String id) {
     // lock first
-    userAndVersionContext.getUserForWrite();
+    final User user = userAndVersionContext.getUserForWrite();
 
     final DataWithVersion dataWithVersion = restHelper.notNullOr404(find(id, type));
+
+    final long referencesCount =
+        JpaUtil.queryOne(entityManager, Long.class,
+            "select count(e) from DataWithVersion e join e.dataType t join e.references r "
+                + "where r = ?1 and not e.id = ?1 and e.versionTo = -1 and t.user = ?2", id, user);
+
+    if (referencesCount > 0) {
+      throw new RequestError("data cannot be deleted, because it is referenced by other data",
+          Status.CONFLICT);
+    }
+
     dataWithVersion.setVersionTo(userAndVersionContext.getNextVersion() - 1);
     if (dataWithVersion.getVersionTo() < dataWithVersion.getVersionFrom()) {
       // should not happen...
       throw new IllegalStateException("data created and deleted in same transaction");
     }
-
-    // TODO: validate no incoming references
 
     return Response.noContent().build();
   }
@@ -197,6 +211,31 @@ public class DataResource {
     final DataWithVersion dataWithVersion = restHelper.notNullOr404(find(id, type));
 
     final DataDto dataDto = toDataDto(jsonString);
+
+    if (dataDto.id != null && !id.equals(dataDto.id)) {
+      // if the id is given, then it must match
+      throw new RequestError("ids are not matching");
+    }
+    if (dataDto.type != null && !type.equals(dataDto.type)) {
+      // if the type is given, then it must match
+      throw new RequestError("types are not matching");
+    }
+
+    if (Objects.equals(dataDto.key1, dataWithVersion.getKey1())
+        && Objects.equals(dataDto.key2, dataWithVersion.getKey2())
+        && Objects.equals(dataDto.data, dataWithVersion.getDataString())
+        && dataWithVersion.getReferencesSet().equals(dataDto.references)) {
+      // no changes, so don't update
+      return restHelper.buildJsonResponse(Status.OK, buildCreateUpdateResponseDto(dataWithVersion));
+    }
+
+    /**
+     * If there are changes and versionFrom is given then it must match the "old" versionFrom of
+     * data, this can be used for optimistic locking.
+     */
+    if (dataDto.versionFrom != null && dataDto.versionFrom != dataWithVersion.getVersionFrom()) {
+      throw new RequestError("versionFrom does not match", Status.CONFLICT);
+    }
 
     validateReferences(dataDto.references);
 
