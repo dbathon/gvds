@@ -88,6 +88,9 @@ public class DataResource {
     public String key1;
     public String key2;
 
+    public Boolean key1Unique;
+    public Boolean key2Unique;
+
     public String data;
 
     public Set<String> references;
@@ -139,6 +142,24 @@ public class DataResource {
     }
   }
 
+  private void checkUniquenessSingle(DataType dataType, final String key, final String value) {
+    final long count =
+        JpaUtil.queryOne(entityManager, Long.class, "select count(e) from DataWithVersion e "
+            + "where e." + key + " = ?1 and e.versionTo = -1 and e.dataType = ?2", value, dataType);
+    if (count > 1) {
+      throw new RequestError(key + " is not unique", Status.CONFLICT);
+    }
+  }
+
+  private void checkUniqueness(DataDto dataDto, DataType dataType) {
+    if (dataDto.key1 != null && Boolean.TRUE.equals(dataDto.key1Unique)) {
+      checkUniquenessSingle(dataType, "key1", dataDto.key1);
+    }
+    if (dataDto.key2 != null && Boolean.TRUE.equals(dataDto.key2Unique)) {
+      checkUniquenessSingle(dataType, "key2", dataDto.key2);
+    }
+  }
+
   @POST
   @Path("{type}")
   public Response createData(@PathParam("type") String type, String jsonString) {
@@ -152,6 +173,8 @@ public class DataResource {
             dataDto.references);
 
     entityManager.persist(dataWithVersion);
+
+    checkUniqueness(dataDto, dataWithVersion.getDataType());
 
     return restHelper.buildCreatedResponse(PATH + "/" + type + "/id/" + dataWithVersion.getId(),
         buildCreateUpdateResponseDto(dataWithVersion));
@@ -249,6 +272,8 @@ public class DataResource {
     }
 
     entityManager.persist(newDataWithVersion);
+
+    checkUniqueness(dataDto, newDataWithVersion.getDataType());
 
     return restHelper.buildJsonResponse(Status.OK, buildCreateUpdateResponseDto(newDataWithVersion));
   }
