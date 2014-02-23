@@ -177,6 +177,10 @@ public class DataResource {
 
     final DataWithVersion dataWithVersion = restHelper.notNullOr404(find(id, type));
     dataWithVersion.setVersionTo(userAndVersionContext.getNextVersion() - 1);
+    if (dataWithVersion.getVersionTo() < dataWithVersion.getVersionFrom()) {
+      // should not happen...
+      throw new IllegalStateException("data created and deleted in same transaction");
+    }
 
     // TODO: validate no incoming references
 
@@ -199,6 +203,11 @@ public class DataResource {
     final DataWithVersion newDataWithVersion =
         new DataWithVersion(dataWithVersion, userAndVersionContext.getNextVersion(), dataDto.key1,
             dataDto.key2, dataDto.data, dataDto.references);
+
+    if (dataWithVersion.getVersionTo() < dataWithVersion.getVersionFrom()) {
+      // could happen if the same data is updated twice in the same transaction, forbid for now...
+      throw new RequestError("multiple update to the same data is not allowed");
+    }
 
     entityManager.persist(newDataWithVersion);
 
