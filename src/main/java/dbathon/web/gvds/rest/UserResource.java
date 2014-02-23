@@ -38,6 +38,8 @@ public class UserResource {
   private UserAndVersionContext userAndVersionContext;
 
   static class UserDto {
+    public UserDto() {}
+
     public UserDto(String username, String password, long version) {
       this.username = username;
       this.password = password;
