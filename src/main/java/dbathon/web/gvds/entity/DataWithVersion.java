@@ -32,7 +32,7 @@ import dbathon.web.gvds.util.StringToBytes;
  */
 @Entity
 @Table(name = "DATA_WITH_VERSION", indexes = {
-    @Index(columnList = "ID_DATA_TYPE, VERSION_TO"),
+    @Index(columnList = "ID_DATA_TYPE, VERSION_TO, ID_"),
     @Index(columnList = "ID_DATA_TYPE, KEY_1, VERSION_TO"),
     @Index(columnList = "ID_DATA_TYPE, KEY_2, VERSION_TO"),
 })
