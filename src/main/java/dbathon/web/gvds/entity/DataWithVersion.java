@@ -31,7 +31,11 @@ import dbathon.web.gvds.util.StringToBytes;
  * TODO: indexes
  */
 @Entity
-@Table(name = "DATA_WITH_VERSION")
+@Table(name = "DATA_WITH_VERSION", indexes = {
+    @Index(columnList = "ID_DATA_TYPE, VERSION_TO"),
+    @Index(columnList = "ID_DATA_TYPE, KEY_1, VERSION_TO"),
+    @Index(columnList = "ID_DATA_TYPE, KEY_2, VERSION_TO"),
+})
 @IdClass(DataWithVersionKey.class)
 public class DataWithVersion extends AbstractEntity {
 
@@ -215,7 +219,7 @@ public class DataWithVersion extends AbstractEntity {
 
   @Transient
   public Set<String> getReferencesSet() {
-    final String referencesString = StringToBytes.toString(getData());
+    final String referencesString = StringToBytes.toString(getReferencesInline());
     if (referencesString == null) {
       return ImmutableSet.of();
     }
