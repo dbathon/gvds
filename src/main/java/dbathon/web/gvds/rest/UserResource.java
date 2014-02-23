@@ -86,7 +86,7 @@ public class UserResource {
   @AuthorizationRequired
   public Response currentUserInfo() {
     final User user = userAndVersionContext.getUser();
-    return restHelper.buildResultResponse(Status.OK,
+    return restHelper.buildJsonResponse(Status.OK,
         new UserDto(user.getUsername(), null, user.getVersion()));
   }
 
