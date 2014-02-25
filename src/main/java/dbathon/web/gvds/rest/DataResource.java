@@ -296,8 +296,7 @@ public class DataResource {
 
   private static final Splitter COMMA_SPLITTER = Splitter.on(",");
 
-  private static final String QUERY_FROM =
-      "from DataWithVersion e left join e.dataType t left join e.references";
+  private static final String QUERY_FROM = "from DataWithVersion e left join e.dataType t";
 
   private enum Property {
     id("e.id", true),
