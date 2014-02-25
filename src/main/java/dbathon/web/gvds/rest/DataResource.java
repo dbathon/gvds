@@ -34,6 +34,7 @@ import dbathon.web.gvds.entity.User;
 import dbathon.web.gvds.persistence.WhereClauseBuilder;
 import dbathon.web.gvds.util.JpaUtil;
 import dbathon.web.gvds.util.StringToBytes;
+import dbathon.web.gvds.util.UrlUtil;
 
 /**
  * <ul>
@@ -188,8 +189,8 @@ public class DataResource {
 
     checkUniqueness(dataDto, dataWithVersion.getDataType());
 
-    return restHelper.buildCreatedResponse(PATH + "/" + type + "/id/" + dataWithVersion.getId(),
-        buildCreateUpdateResponseDto(dataWithVersion));
+    return restHelper.buildCreatedResponse(PATH + "/" + UrlUtil.urlEncode(type) + "/id/"
+        + dataWithVersion.getId(), buildCreateUpdateResponseDto(dataWithVersion));
   }
 
   private DataWithVersion find(String id, String type) {
