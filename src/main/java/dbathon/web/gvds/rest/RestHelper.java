@@ -93,7 +93,7 @@ public class RestHelper {
       final String requestPath = request.getRequestURI();
       if (!requestUrl.endsWith(requestPath)) {
         throw new IllegalStateException("requestUrl does not end with requestPath: " + requestUrl
-            + ", " + relativePath);
+            + ", " + requestPath);
       }
       baseUri =
           requestUrl.substring(0, requestUrl.length() - requestPath.length())
