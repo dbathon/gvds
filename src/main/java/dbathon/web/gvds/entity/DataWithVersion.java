@@ -217,15 +217,19 @@ public class DataWithVersion extends AbstractEntity {
     this.referencesInline = referencesInline;
   }
 
-  @Transient
-  public Set<String> getReferencesSet() {
-    final String referencesString = StringToBytes.toString(getReferencesInline());
+  public static Set<String> toReferencesSet(byte[] referencesInline) {
+    final String referencesString = StringToBytes.toString(referencesInline);
     if (referencesString == null) {
       return ImmutableSet.of();
     }
     else {
       return ImmutableSet.copyOf(SPLITTER_SPACE.split(referencesString));
     }
+  }
+
+  @Transient
+  public Set<String> getReferencesSet() {
+    return toReferencesSet(getReferencesInline());
   }
 
 }

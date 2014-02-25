@@ -1,11 +1,16 @@
 package dbathon.web.gvds.rest;
 
+import java.util.ArrayList;
 import java.util.Collections;
+import java.util.EnumMap;
+import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import javax.enterprise.context.ApplicationScoped;
 import javax.inject.Inject;
 import javax.persistence.EntityManager;
+import javax.persistence.TypedQuery;
 import javax.transaction.Transactional;
 import javax.ws.rs.Consumes;
 import javax.ws.rs.DELETE;
@@ -15,13 +20,20 @@ import javax.ws.rs.PUT;
 import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
+import javax.ws.rs.core.Context;
 import javax.ws.rs.core.MediaType;
+import javax.ws.rs.core.MultivaluedMap;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.core.Response.Status;
+import javax.ws.rs.core.UriInfo;
+import com.google.common.base.Splitter;
+import com.google.common.collect.Sets;
 import dbathon.web.gvds.entity.DataType;
 import dbathon.web.gvds.entity.DataWithVersion;
 import dbathon.web.gvds.entity.User;
+import dbathon.web.gvds.persistence.WhereClauseBuilder;
 import dbathon.web.gvds.util.JpaUtil;
+import dbathon.web.gvds.util.StringToBytes;
 
 /**
  * <ul>
@@ -276,6 +288,213 @@ public class DataResource {
     checkUniqueness(dataDto, newDataWithVersion.getDataType());
 
     return restHelper.buildJsonResponse(Status.OK, buildCreateUpdateResponseDto(newDataWithVersion));
+  }
+
+  private <T> T parseJson(String jsonString, Class<T> classOfT) {
+    return jsonString == null ? null : restHelper.fromJsonString(jsonString, classOfT);
+  }
+
+  private static final Splitter COMMA_SPLITTER = Splitter.on(",");
+
+  private static final String QUERY_FROM =
+      "from DataWithVersion e left join e.dataType t left join e.references";
+
+  private enum Property {
+    id("e.id", true),
+    versionFrom("e.versionFrom", true),
+    versionTo("e.versionTo", false),
+    type("t.typeName", true),
+    key1("e.key1", true),
+    key2("e.key2", true),
+    data("e.data", false) {
+      @Override
+      public Object extractValue(Object queryResult) {
+        return queryResult == null ? null : StringToBytes.toString((byte[]) queryResult);
+      }
+    },
+    references("e.referencesInline", false) {
+      @Override
+      public Object extractValue(Object queryResult) {
+        return queryResult == null ? null : DataWithVersion.toReferencesSet((byte[]) queryResult);
+      }
+    };
+
+    private final String queryExpression;
+
+    private final boolean orderPossible;
+
+    private Property(String queryExpression, boolean orderPossible) {
+      this.queryExpression = queryExpression;
+      this.orderPossible = orderPossible;
+    }
+
+    public String getQueryExpression() {
+      return queryExpression;
+    }
+
+    public boolean isOrderPossible() {
+      return orderPossible;
+    }
+
+    public Object extractValue(Object queryResult) {
+      return queryResult;
+    }
+
+    public static Property forName(String name) {
+      try {
+        return Property.valueOf(name);
+      }
+      catch (final RuntimeException e) {
+        throw new RequestError("unknown property: " + name);
+      }
+    }
+  }
+
+  private WhereClauseBuilder buildWhereClause(final DataType dataType,
+      MultivaluedMap<String, String> queryParameters) {
+    final WhereClauseBuilder wcb = new WhereClauseBuilder();
+    wcb.add("e.versionTo = -1");
+    wcb.add("e.dataType = ?", dataType);
+
+    // TODO ...
+
+    return wcb;
+  }
+
+  private Object extractPropertyValue(Property property, Map<Property, Integer> propertyToColumn,
+      Object[] row) {
+    final Integer index = propertyToColumn.get(property);
+    if (index != null) {
+      return property.extractValue(row[index]);
+    }
+    else {
+      return null;
+    }
+  }
+
+  @GET
+  @Path("{type}")
+  public Response queryData(@PathParam("type") String type, @Context UriInfo uriInfo) {
+    final DataType dataType = userAndVersionContext.getDataType(type);
+    if (dataType == null) {
+      return restHelper.buildResultResponse(Status.OK, Collections.emptyList());
+    }
+
+    final MultivaluedMap<String, String> queryParameters = uriInfo.getQueryParameters();
+
+    final Set<String> include;
+    if (queryParameters.containsKey("include")) {
+      include = Sets.newHashSet(COMMA_SPLITTER.split(queryParameters.getFirst("include")));
+    }
+    else {
+      include = null;
+    }
+
+    final StringBuilder q = new StringBuilder("select ");
+
+    final Map<Property, Integer> propertyToColumn = new EnumMap<>(Property.class);
+
+    int columnCount = 0;
+    for (final Property property : Property.values()) {
+      if (include == null || include.contains(property.name())) {
+        if (columnCount > 0) {
+          q.append(", ");
+        }
+        q.append(property.getQueryExpression());
+        propertyToColumn.put(property, columnCount);
+        ++columnCount;
+      }
+    }
+
+    // add dummy columns to ensure we have at least two...
+    while (columnCount < 2) {
+      if (columnCount > 0) {
+        q.append(", ");
+      }
+      q.append(Property.versionFrom.getQueryExpression());
+      ++columnCount;
+    }
+
+    q.append(" ").append(QUERY_FROM);
+
+    final WhereClauseBuilder wcb = buildWhereClause(dataType, queryParameters);
+
+    q.append(wcb.buildWhereClause());
+
+    q.append(" order by ");
+
+    final String order = queryParameters.getFirst("order");
+    if (order != null) {
+      for (String orderPart : COMMA_SPLITTER.split(order)) {
+        boolean desc = false;
+        if (orderPart.startsWith("-")) {
+          desc = true;
+          orderPart = orderPart.substring(1);
+        }
+        final Property property = Property.forName(orderPart);
+        if (!property.isOrderPossible()) {
+          throw new RequestError("cannot order by " + orderPart);
+        }
+        q.append(property.getQueryExpression()).append(desc ? " desc" : " asc").append(", ");
+      }
+    }
+
+    // always order by id last, to have a deterministic ordering
+    q.append("e.id");
+
+    System.out.println("query: " + q.toString());
+
+    final TypedQuery<Object[]> query =
+        wcb.applyParameters(entityManager.createQuery(q.toString(), Object[].class));
+
+    final Integer first = parseJson(queryParameters.getFirst("first"), Integer.class);
+    Integer max = parseJson(queryParameters.getFirst("max"), Integer.class);
+    if (max == null || max > 1000) {
+      // at most 1000 rows
+      max = 1000;
+    }
+    if (first != null) {
+      query.setFirstResult(first);
+    }
+    query.setMaxResults(max);
+
+    final List<Object[]> queryResult = query.getResultList();
+
+    final List<DataDto> result = new ArrayList<>(queryResult.size());
+
+    for (final Object[] row : queryResult) {
+      @SuppressWarnings("unchecked")
+      final Set<String> rowReferences =
+          (Set<String>) extractPropertyValue(Property.references, propertyToColumn, row);
+      result.add(new DataDto((String) extractPropertyValue(Property.id, propertyToColumn, row),
+          (Long) extractPropertyValue(Property.versionFrom, propertyToColumn, row),
+          (Long) extractPropertyValue(Property.versionTo, propertyToColumn, row),
+          (String) extractPropertyValue(Property.type, propertyToColumn, row),
+          (String) extractPropertyValue(Property.key1, propertyToColumn, row),
+          (String) extractPropertyValue(Property.key2, propertyToColumn, row),
+          (String) extractPropertyValue(Property.data, propertyToColumn, row), rowReferences));
+    }
+
+    return restHelper.buildResultResponse(Status.OK, result);
+  }
+
+  @GET
+  @Path("{type}/count")
+  public Response countData(@PathParam("type") String type, @Context UriInfo uriInfo) {
+    final DataType dataType = userAndVersionContext.getDataType(type);
+    if (dataType == null) {
+      return restHelper.buildResultResponse(Status.OK, 0L);
+    }
+
+    final WhereClauseBuilder wcb = buildWhereClause(dataType, uriInfo.getQueryParameters());
+
+    final String q = "select count(e) " + QUERY_FROM + wcb.buildWhereClause();
+
+    System.out.println("count query: " + q);
+
+    final TypedQuery<Long> query = wcb.applyParameters(entityManager.createQuery(q, Long.class));
+
+    return restHelper.buildResultResponse(Status.OK, query.getSingleResult());
   }
 
 }
