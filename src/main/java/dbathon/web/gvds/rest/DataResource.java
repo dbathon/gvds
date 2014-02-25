@@ -302,7 +302,7 @@ public class DataResource {
   private enum Property {
     id("e.id", true),
     versionFrom("e.versionFrom", true),
-    versionTo("e.versionTo", false),
+    versionTo("e.versionTo", true),
     type("t.typeName", true),
     key1("e.key1", true),
     key2("e.key2", true),
@@ -353,8 +353,16 @@ public class DataResource {
   private WhereClauseBuilder buildWhereClause(final DataType dataType,
       MultivaluedMap<String, String> queryParameters) {
     final WhereClauseBuilder wcb = new WhereClauseBuilder();
-    wcb.add("e.versionTo = -1");
     wcb.add("e.dataType = ?", dataType);
+
+    final Long version = parseJson(queryParameters.getFirst("version"), Long.class);
+
+    if (version == null) {
+      wcb.add("e.versionTo = -1");
+    }
+    else {
+      wcb.add("e.versionFrom <= ? and (e.versionTo >= ? or e.versionTo = -1)", version, version);
+    }
 
     // TODO ...
 
