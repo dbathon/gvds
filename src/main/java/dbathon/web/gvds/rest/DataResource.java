@@ -1,12 +1,17 @@
 package dbathon.web.gvds.rest;
 
+import java.lang.reflect.Array;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Objects;
 import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import javax.enterprise.context.ApplicationScoped;
 import javax.inject.Inject;
 import javax.persistence.EntityManager;
@@ -299,20 +304,22 @@ public class DataResource {
 
   private static final String QUERY_FROM = "from DataWithVersion e left join e.dataType t";
 
+  private static final Pattern CONDITION_PATTERN = Pattern.compile("(\\w+)-(\\w+)");
+
   private enum Property {
-    id("e.id", true),
-    versionFrom("e.versionFrom", true),
-    versionTo("e.versionTo", true),
-    type("t.typeName", true),
-    key1("e.key1", true),
-    key2("e.key2", true),
-    data("e.data", false) {
+    id("e.id", String.class),
+    versionFrom("e.versionFrom", Long.class),
+    versionTo("e.versionTo", Long.class),
+    type("t.typeName", String.class),
+    key1("e.key1", String.class),
+    key2("e.key2", String.class),
+    data("e.data") {
       @Override
       public Object extractValue(Object queryResult) {
         return queryResult == null ? null : StringToBytes.toString((byte[]) queryResult);
       }
     },
-    references("e.referencesInline", false) {
+    references("e.referencesInline") {
       @Override
       public Object extractValue(Object queryResult) {
         return queryResult == null ? null : DataWithVersion.toReferencesSet((byte[]) queryResult);
@@ -321,19 +328,27 @@ public class DataResource {
 
     private final String queryExpression;
 
-    private final boolean orderPossible;
+    private final Class<?> expressionType;
 
-    private Property(String queryExpression, boolean orderPossible) {
+    private Property(String queryExpression, Class<?> expressionType) {
       this.queryExpression = queryExpression;
-      this.orderPossible = orderPossible;
+      this.expressionType = expressionType;
+    }
+
+    private Property(String queryExpression) {
+      this(queryExpression, null);
     }
 
     public String getQueryExpression() {
       return queryExpression;
     }
 
+    public Class<?> getExpressionType() {
+      return expressionType;
+    }
+
     public boolean isOrderPossible() {
-      return orderPossible;
+      return expressionType != null;
     }
 
     public Object extractValue(Object queryResult) {
@@ -346,6 +361,100 @@ public class DataResource {
       }
       catch (final RuntimeException e) {
         throw new RequestError("unknown property: " + name);
+      }
+    }
+
+    public static Property forNameOrNull(String name) {
+      try {
+        return Property.valueOf(name);
+      }
+      catch (final RuntimeException ignore) {
+        return null;
+      }
+    }
+  }
+
+  private void addSimpleCondition(WhereClauseBuilder wcb, Property property, String operator,
+      String valueStr) {
+    final Class<?> type = property.getExpressionType();
+    if (type == null) {
+      return;
+    }
+
+    final Object value;
+    if (operator.endsWith("null") || operator.endsWith("in")) {
+      // no value needed or handled below
+      value = null;
+    }
+    else if (type == String.class) {
+      value = valueStr;
+    }
+    else {
+      value = parseJson(valueStr, type);
+    }
+
+    switch (operator) {
+    case "null":
+      wcb.add(property.getQueryExpression() + " is null");
+      return;
+    case "notnull":
+      wcb.add(property.getQueryExpression() + " is not null");
+      return;
+    }
+
+    if (type == String.class || Number.class.isAssignableFrom(type)) {
+      // string or number
+      switch (operator) {
+      case "eq":
+        wcb.add(property.getQueryExpression() + " = ?", value);
+        return;
+      case "ne":
+        wcb.add(property.getQueryExpression() + " <> ?", value);
+        return;
+      case "lt":
+        wcb.add(property.getQueryExpression() + " < ?", value);
+        return;
+      case "gt":
+        wcb.add(property.getQueryExpression() + " > ?", value);
+        return;
+      case "le":
+        wcb.add(property.getQueryExpression() + " <= ?", value);
+        return;
+      case "ge":
+        wcb.add(property.getQueryExpression() + " >= ?", value);
+        return;
+      }
+      if ("in".equals(operator) || "notin".equals(operator)) {
+        // TODO: improve
+        final Class<?> arrayType = Array.newInstance(type, 0).getClass();
+        final Object array = parseJson(valueStr, arrayType);
+        final List<Object> list = Arrays.asList((Object[]) array);
+        for (final Object o : list) {
+          if (o == null) {
+            throw new RequestError("list parameter cannot contain null");
+          }
+        }
+        wcb.add(property.getQueryExpression() + " " + ("in".equals(operator) ? "in" : "not in")
+            + " (?)", list);
+        return;
+      }
+    }
+
+    if (type == String.class) {
+      // string only
+      switch (operator) {
+      case "like":
+        wcb.add(property.getQueryExpression() + " like ?", value);
+        return;
+      case "notlike":
+        wcb.add(property.getQueryExpression() + " not like ?", value);
+        return;
+      case "ilike":
+        wcb.add("lower(" + property.getQueryExpression() + ") like lower(?)", value);
+        return;
+      case "notilike":
+        wcb.add("lower(" + property.getQueryExpression() + ") not like lower(?)", value);
+        return;
       }
     }
   }
@@ -364,7 +473,19 @@ public class DataResource {
       wcb.add("e.versionFrom <= ? and (e.versionTo >= ? or e.versionTo = -1)", version, version);
     }
 
-    // TODO ...
+    for (final Entry<String, List<String>> entry : queryParameters.entrySet()) {
+      final Matcher matcher = CONDITION_PATTERN.matcher(entry.getKey());
+      if (matcher.matches()) {
+        final Property property = Property.forNameOrNull(matcher.group(1));
+        if (property != null) {
+          for (final String value : entry.getValue()) {
+            addSimpleCondition(wcb, property, matcher.group(2), value);
+          }
+        }
+      }
+    }
+
+    // TODO filter by references...
 
     return wcb;
   }
