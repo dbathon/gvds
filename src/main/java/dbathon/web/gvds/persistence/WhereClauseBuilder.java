@@ -55,8 +55,11 @@ public class WhereClauseBuilder {
     return stack.get(stack.size() - 1);
   }
 
-  private String processCondition(String condition, Object[] params) {
-    final StringBuffer sb = new StringBuffer(condition.length() * 2).append("(");
+  private String processCondition(String condition, boolean parens, Object[] params) {
+    final StringBuffer sb = new StringBuffer(condition.length() * 2);
+    if (parens) {
+      sb.append("(");
+    }
 
     final Matcher m = PARAM_PATTERN.matcher(condition);
     boolean found = m.find();
@@ -87,11 +90,18 @@ public class WhereClauseBuilder {
       throw new IllegalArgumentException("to many params: " + params.length + " instead of " + idx);
     }
 
-    return sb.append(")").toString();
+    if (parens) {
+      sb.append(")");
+    }
+    return sb.toString();
+  }
+
+  private void addInternal(String condition, boolean parens, Object... params) {
+    current().conditions.add(processCondition(condition, parens, params));
   }
 
   public void add(String condition, Object... params) {
-    current().conditions.add(processCondition(condition, params));
+    addInternal(condition, true, params);
   }
 
   public void add(String condition) {
@@ -114,7 +124,7 @@ public class WhereClauseBuilder {
     stack.remove(stack.size() - 1);
     // ... and add to the outer conditions if necessary
     if (!current.conditions.isEmpty()) {
-      add(current.toString());
+      addInternal(current.toString(), current.conditions.size() > 1, (Object[]) null);
     }
   }
 
