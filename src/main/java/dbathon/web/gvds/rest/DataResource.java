@@ -397,7 +397,7 @@ public class DataResource {
     case "null":
       wcb.add(property.getQueryExpression() + " is null");
       return;
-    case "notnull":
+    case "notNull":
       wcb.add(property.getQueryExpression() + " is not null");
       return;
     }
@@ -446,13 +446,13 @@ public class DataResource {
       case "like":
         wcb.add(property.getQueryExpression() + " like ?", value);
         return;
-      case "notlike":
+      case "notLike":
         wcb.add(property.getQueryExpression() + " not like ?", value);
         return;
       case "ilike":
         wcb.add("lower(" + property.getQueryExpression() + ") like lower(?)", value);
         return;
-      case "notilike":
+      case "notIlike":
         wcb.add("lower(" + property.getQueryExpression() + ") not like lower(?)", value);
         return;
       }
