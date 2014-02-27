@@ -3,6 +3,7 @@ package dbathon.web.gvds.rest;
 import java.lang.reflect.Array;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.EnumMap;
 import java.util.List;
@@ -32,6 +33,8 @@ import javax.ws.rs.core.Response;
 import javax.ws.rs.core.Response.Status;
 import javax.ws.rs.core.UriInfo;
 import com.google.common.base.Splitter;
+import com.google.common.collect.ArrayListMultimap;
+import com.google.common.collect.ListMultimap;
 import com.google.common.collect.Sets;
 import dbathon.web.gvds.entity.DataType;
 import dbathon.web.gvds.entity.DataWithVersion;
@@ -304,7 +307,7 @@ public class DataResource {
 
   private static final String QUERY_FROM = "from DataWithVersion e left join e.dataType t";
 
-  private static final Pattern CONDITION_PATTERN = Pattern.compile("(\\w+)-(\\w+)");
+  private static final Pattern CONDITION_PATTERN = Pattern.compile("((?:or\\w*-)?)(\\w+)-(\\w+)");
 
   private enum Property {
     id("e.id", String.class),
@@ -473,16 +476,42 @@ public class DataResource {
       wcb.add("e.versionFrom <= ? and (e.versionTo >= ? or e.versionTo = -1)", version, version);
     }
 
+    final ListMultimap<String, Object[]> orGroups = ArrayListMultimap.create();
+
     for (final Entry<String, List<String>> entry : queryParameters.entrySet()) {
       final Matcher matcher = CONDITION_PATTERN.matcher(entry.getKey());
       if (matcher.matches()) {
-        final Property property = Property.forNameOrNull(matcher.group(1));
+        final Property property = Property.forNameOrNull(matcher.group(2));
         if (property != null) {
+          final String operator = matcher.group(3);
+          final String orGroup = matcher.group(1);
+
           for (final String value : entry.getValue()) {
-            addSimpleCondition(wcb, property, matcher.group(2), value);
+            if (orGroup.isEmpty()) {
+              addSimpleCondition(wcb, property, operator, value);
+            }
+            else {
+              orGroups.put(orGroup, new Object[] {
+                  property, operator, value
+              });
+            }
           }
         }
       }
+    }
+
+    for (final Collection<Object[]> orGroupList : orGroups.asMap().values()) {
+      wcb.startOr();
+      for (final Object[] orGroupEntry : orGroupList) {
+        // wrap each condition in an and (in case it consists of multiple adds
+        wcb.startAnd();
+
+        addSimpleCondition(wcb, (Property) orGroupEntry[0], (String) orGroupEntry[1],
+            (String) orGroupEntry[2]);
+
+        wcb.finishAnd();
+      }
+      wcb.finishOr();
     }
 
     // TODO filter by references...
