@@ -1,4 +1,4 @@
-package dbathon.web.gvds.rest;
+package dbathon.web.gvds.resource;
 
 import java.io.Serializable;
 import java.util.HashMap;
@@ -11,6 +11,7 @@ import javax.transaction.TransactionScoped;
 import javax.ws.rs.core.Response.Status;
 import dbathon.web.gvds.entity.DataType;
 import dbathon.web.gvds.entity.User;
+import dbathon.web.gvds.rest.RequestError;
 import dbathon.web.gvds.util.JpaUtil;
 
 @TransactionScoped

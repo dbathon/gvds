@@ -1,4 +1,4 @@
-package dbathon.web.gvds.rest;
+package dbathon.web.gvds.resource;
 
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Inherited;

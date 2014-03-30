@@ -1,4 +1,4 @@
-package dbathon.web.gvds.rest;
+package dbathon.web.gvds.resource;
 
 import java.util.Arrays;
 import java.util.List;

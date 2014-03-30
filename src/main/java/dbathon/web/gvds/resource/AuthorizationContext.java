@@ -1,4 +1,4 @@
-package dbathon.web.gvds.rest;
+package dbathon.web.gvds.resource;
 
 import javax.enterprise.context.RequestScoped;
 import com.google.common.base.Preconditions;

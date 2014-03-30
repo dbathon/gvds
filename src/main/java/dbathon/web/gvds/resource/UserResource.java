@@ -1,4 +1,4 @@
-package dbathon.web.gvds.rest;
+package dbathon.web.gvds.resource;
 
 import java.util.List;
 import javax.enterprise.context.ApplicationScoped;
@@ -17,6 +17,8 @@ import javax.ws.rs.core.Response.Status;
 import com.google.common.base.Strings;
 import dbathon.web.gvds.entity.User;
 import dbathon.web.gvds.misc.Pbkdf2Service;
+import dbathon.web.gvds.rest.RequestError;
+import dbathon.web.gvds.rest.RestHelper;
 import dbathon.web.gvds.util.JpaUtil;
 
 @Path("user")

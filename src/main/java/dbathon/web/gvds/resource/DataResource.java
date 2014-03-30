@@ -1,4 +1,4 @@
-package dbathon.web.gvds.rest;
+package dbathon.web.gvds.resource;
 
 import java.lang.reflect.Array;
 import java.util.ArrayList;
@@ -40,6 +40,8 @@ import dbathon.web.gvds.entity.DataType;
 import dbathon.web.gvds.entity.DataWithVersion;
 import dbathon.web.gvds.entity.User;
 import dbathon.web.gvds.persistence.WhereClauseBuilder;
+import dbathon.web.gvds.rest.RequestError;
+import dbathon.web.gvds.rest.RestHelper;
 import dbathon.web.gvds.util.JpaUtil;
 import dbathon.web.gvds.util.StringToBytes;
 import dbathon.web.gvds.util.UrlUtil;
